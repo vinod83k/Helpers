@@ -1,0 +1,39 @@
+public class CsvOutputFormatter : TextOutputFormatter
+{
+    public string ContentType { get; }
+    public CsvOutputFormatter()
+    {
+        SupportedMediaTypes.Add(MediaTypeHeaderValue.Parse("text/csv"));
+        SupportedEncodings.Add(Encoding.UTF8);
+        SupportedEncodings.Add(Encoding.Unicode);
+    }
+    // optional, but makes sense to restrict to a specific condition
+    protected override bool CanWriteType(Type type)
+    {
+        if (typeof(Person).IsAssignableFrom(type)
+            || typeof(IEnumerable<Person>).IsAssignableFrom(type))
+        {
+            return base.CanWriteType(type);
+        }
+        return false;
+    }
+    // this needs to be overwritten
+    public override Task WriteResponseBodyAsync(OutputFormatterWriteContext context, Encoding selectedEncoding)
+    {
+        var serviceProvider = context.HttpContext.RequestServices;
+        var logger = serviceProvider.GetService(typeof(ILogger<CsvOutputFormatter>)) as ILogger;
+        var response = context.HttpContext.Response;
+        var csv = new CsvWriter(new StreamWriter(response.Body));
+        if (context.Object is IEnumerable<Person>)
+        {
+            var persons = context.Object as IEnumerable<Person>;
+            csv.WriteRecords(persons);
+        }
+        else
+        {
+            var person = context.Object as Person;
+            csv.WriteRecord<Person>(person);
+        }
+        return Task.CompletedTask;
+    }
+}
